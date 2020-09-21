@@ -44,7 +44,7 @@ class RpcCall
     Logger * log;
 
 public:
-    RpcCall(std::shared_ptr<T> req_) : req(req_), resp(std::make_unique<S>()), log(&Logger::get("pingcap.tikv")) {}
+    RpcCall(std::shared_ptr<T> req_) : req(req_), resp(std::make_shared<S>()), log(&Logger::get("pingcap.tikv")) {}
 
     void setCtx(RPCContextPtr rpc_ctx)
     {
@@ -67,6 +67,13 @@ public:
             log->error(err_msg);
             throw Exception(err_msg, GRPCErrorCode);
         }
+    }
+
+    auto callStream(std::shared_ptr<KvConnClient> client, int timeout)
+    {
+        grpc::ClientContext context;
+        context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(timeout));
+        return Trait::doRPCCall(&context, client, *req);
     }
 };
 
@@ -95,6 +102,14 @@ struct RpcClient
         ConnArrayPtr connArray = getConnArray(addr);
         auto connClient = connArray->get();
         rpc.call(connClient, timeout);
+    }
+
+    template <class T>
+    auto sendStreamRequest(std::string addr, RpcCall<T> & rpc, int timeout)
+    {
+        ConnArrayPtr connArray = getConnArray(addr);
+        auto connClient = connArray->get();
+        return rpc.callStream(connClient, timeout);
     }
 };
 
