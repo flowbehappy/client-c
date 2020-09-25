@@ -69,12 +69,7 @@ public:
         }
     }
 
-    auto callStream(std::shared_ptr<KvConnClient> client, int timeout)
-    {
-        grpc::ClientContext context;
-        context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(timeout));
-        return Trait::doRPCCall(&context, client, *req);
-    }
+    auto callStream(grpc::ClientContext * context, std::shared_ptr<KvConnClient> client) { return Trait::doRPCCall(context, client, *req); }
 };
 
 template <typename T>
@@ -105,11 +100,11 @@ struct RpcClient
     }
 
     template <class T>
-    auto sendStreamRequest(std::string addr, RpcCall<T> & rpc, int timeout)
+    auto sendStreamRequest(std::string addr, grpc::ClientContext * context, RpcCall<T> & rpc)
     {
         ConnArrayPtr connArray = getConnArray(addr);
         auto connClient = connArray->get();
-        return rpc.callStream(connClient, timeout);
+        return rpc.callStream(context, connClient);
     }
 };
 
