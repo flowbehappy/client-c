@@ -72,6 +72,46 @@ struct RegionClient
         }
     }
 
+    // This method send a request to region, but is NOT Thread-Safe !!
+    template <typename T>
+    auto sendReqToRegionPeerAddr(Backoffer & bo, std::shared_ptr<T> req, int timeout = dailTimeout, StoreType store_type = TiKV)
+    {
+        RpcCall<T> rpc(req);
+        for (;;)
+        {
+            RPCContextPtr ctx = cluster->region_cache->getRPCContext(bo, region_id, store_type);
+            if (ctx == nullptr)
+            {
+                // If the region is not found in cache, it must be out
+                // of date and already be cleaned up. We can skip the
+                // RPC by returning RegionError directly.
+
+                throw Exception("Region epoch not match!", RegionEpochNotMatch);
+            }
+            const auto & store_addr = ctx->peer_addr;
+            rpc.setCtx(ctx);
+            try
+            {
+                cluster->rpc_client->sendRequest(store_addr, rpc, timeout);
+            }
+            catch (const Exception & e)
+            {
+                onSendFail(bo, e, ctx);
+                continue;
+            }
+            auto resp = rpc.getResp();
+            if (resp->has_region_error())
+            {
+                log->warning("region " + region_id.toString() + " find error: " + resp->region_error().message());
+                onRegionError(bo, ctx, resp->region_error());
+            }
+            else
+            {
+                return resp;
+            }
+        }
+    }
+
 protected:
     void onRegionError(Backoffer & bo, RPCContextPtr rpc_ctx, const errorpb::Error & err);
 

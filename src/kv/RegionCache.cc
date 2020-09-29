@@ -30,7 +30,8 @@ RPCContextPtr RegionCache::getRPCContext(Backoffer & bo, const RegionVerID & id,
         {
             size_t peer_index = (i + start_index) % peer_size;
             auto peer = peers[peer_index];
-            std::string addr = getStore(bo, peer.store_id()).addr;
+            auto store = getStore(bo, peer.store_id());
+            std::string addr = store.addr;
             if (addr.empty())
             {
                 dropStore(peer.store_id());
@@ -41,7 +42,8 @@ RPCContextPtr RegionCache::getRPCContext(Backoffer & bo, const RegionVerID & id,
             }
             if (store_type == TiFlash)
                 region->work_flash_idx.store(peer_index);
-            return std::make_shared<RPCContext>(id, meta, peer, addr);
+            std::string peer_addr = store.peer_addr.empty() ? addr : store.peer_addr;
+            return std::make_shared<RPCContext>(id, meta, peer, addr, peer_addr);
         }
         dropRegion(id);
         bo.backoff(boRegionMiss, Exception("region miss, region id is: " + std::to_string(id.id), RegionUnavailable));
@@ -180,7 +182,7 @@ metapb::Store RegionCache::loadStore(Backoffer & bo, uint64_t id)
         {
             // TODO:: The store may be not ready, it's better to check store's state.
             const auto & store = pd_client->getStore(id);
-            log->information("load store id " + std::to_string(id) + " address %s", store.address());
+            log->information("load store id " + std::to_string(id) + " address %s, peer_address %s", store.address(), store.peer_address());
             return store;
         }
         catch (Exception & e)

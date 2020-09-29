@@ -130,9 +130,10 @@ struct RPCContext
     metapb::Region meta;
     metapb::Peer peer;
     std::string addr;
+    std::string peer_addr;
 
-    RPCContext(const RegionVerID & region_, const metapb::Region & meta_, const metapb::Peer & peer_, const std::string & addr_)
-        : region(region_), meta(meta_), peer(peer_), addr(addr_)
+    RPCContext(const RegionVerID & region_, const metapb::Region & meta_, const metapb::Peer & peer_, const std::string & addr_, const std::string & peer_addr_ = {})
+        : region(region_), meta(meta_), peer(peer_), addr(addr_), peer_addr(peer_addr_)
     {}
 };
 
